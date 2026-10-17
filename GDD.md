@@ -1,515 +1,268 @@
-# GDD — PokéSurvivor · Mundo Misterioso
+# GDD — PokéSurvivor · 寶可夢不可思議的迷宮
 
-> Documento de diseño vivo. Refleja el estado **actual** del juego; al final hay
-> un registro de decisiones con fecha.
+> 動態遊戲設計文件。反映遊戲**當前**的實際設計與實現狀態；文末附有按日期排序的決策記錄。
 
-## 1. Concepto
+## 1. 遊戲概念
 
-- **Plataforma:** navegador. Se abre con doble clic en `index.html`, sin servidor.
-- **Género:** bullet-heaven / horde survival + **roguelike** + **gacha de personajes**.
-- **Referencias:** Survivor.io, Megabonk, Vampire Survivors.
-- **Estética:** **Pokémon Mundo Misterioso** (sprites de PMD, cajas de diálogo
-  azules, iconos pixel art, música de aldea).
-- **El jugador es un Pokémon.** Hay **966 Pokémon** de las 9 generaciones.
-- **Todo es local:** sprites, datos, fuente, música y guardado. El juego no hace
-  ninguna petición a internet.
+- **平台：** 瀏覽器。雙擊 `index.html` 即可運行，無需後端伺服器。
+- **類型：** 彈幕倖存者（Bullet-Heaven / 類吸血鬼倖存者）+ **Roguelike** + **角色轉蛋（Gacha）**。
+- **參考作品：** Survivor.io、Megabonk、Vampire Survivors。
+- **美術風格：** **《寶可夢不可思議的迷宮》（Pokémon Mystery Dungeon）**（PMD 精靈圖、藍色對話框、像素風格圖示、村莊背景音樂）。
+- **玩家身分：** 玩家扮演一隻寶可夢。收錄第 1 至第 9 世代共 **966 隻寶可夢**。
+- **完全本機運行：** 精靈圖、遊戲資料、字型、音樂與存檔皆置於本機端。遊戲運行時不發送任何外部網路請求。
 
-## 2. Flujo de pantallas
+## 2. 遊戲介面流程
 
-```
-Login / Crear cuenta / Invitado
+```text
+登入 / 建立帳號 / 訪客模式
         │
-        ├─ (primera vez) Test de personalidad ─> Compañero asignado
-        │                                          ├─ ¡Vamos juntos!
-        │                                          └─ Elegir otro (29 starters)
+        ├─ (初次遊玩) 性格測驗 ──> 推薦同行夥伴
+        │                             ├─ 一同出發！
+        │                             └─ 自選其他夥伴（29 隻初始寶可夢）
         ▼
-Menú principal  (el mundo de fondo, con Pokémon salvajes paseando)
-   ├─ Jugar      → run → resumen (+ Pokémonedas, shinies conseguidos) → menú
-   ├─ Pokémon    → colección por región, elegir compañero (normal o shiny)
-   ├─ Mejoras    → mejoras permanentes
-   ├─ Gacha      → 9 banners, uno por región
-   ├─ Amigos     → añadir por apodo, en línea, invitar → Sala (hasta 4) → partida en grupo
-   └─ Ranking    → tiempo aguantado: Solo / Grupo × día, semana, mes, año, histórico
+主選單（背景為世界地圖，有野生寶可夢走動）
+   ├─ 開始探險   → 進入關卡 (Run) → 結算（獲得寶可幣、捕獲異色寶可夢）→ 返回選單
+   ├─ 寶可夢圖鑑 → 各地區收藏庫、更換同行夥伴（一般 / 異色形態）
+   ├─ 永久強化   → 各寶可夢獨立能力升級
+   ├─ 轉蛋機     → 9 個卡池，各地區專屬獨立卡池
+   ├─ 好友系統   → 依暱稱搜尋加入好友、即時在線狀態、發送邀請 → 組隊房間（最多 4 人）→ 合作闖關
+   └─ 天梯排行   → 存活時間榜：單人 / 組隊 × 今日、本週、本月、年度、歷史總榜
 ```
 
-### 2.3 Multijugador cooperativo (hasta 4)
-- **Amigos por apodo.** Las cuentas de nombre y contraseña usan su nombre; las
-  de Google eligen un apodo único (su nombre real nunca se enseña).
-- **Sala:** el que invita es el anfitrión; los amigos en línea reciben la
-  invitación en el menú. El anfitrión empieza la partida para todos.
-- **Conexión:** directa entre navegadores (WebRTC, estrella con el anfitrión);
-  si la red no lo permite, por la Realtime Database (más lento, pero funciona).
-- **Quién manda:** el anfitrión lleva enemigos, objetos, experiencia y reloj;
-  cada jugador su Pokémon (posición, vida, ataques). Los golpes a enemigos se
-  mandan al anfitrión; los ataques de los compañeros se ven como "fantasmas".
-- **Experiencia compartida**; al subir de nivel cada uno elige su carta y el
-  juego **no sigue hasta que eligen todos**.
-- **Caer:** te quedas en el suelo; un compañero a tu lado 3 s te levanta con la
-  mitad de vida. Se acaba cuando caéis todos.
-- **Flechas** en el borde de la pantalla hacia los compañeros que no se ven
-  (nombre y metros; roja si está caído).
-- Dificultad: ×(1 + 0,75·(n−1)) enemigos y ×(1 + 0,3·(n−1)) vida; la
-  experiencia del equipo se divide entre (1 + 0,6·(n−1)).
-- La pausa no para el juego; si se va el anfitrión, la partida acaba para todos.
+### 2.1 帳號系統
+- 登入、註冊新帳號，或**以訪客身分遊玩**（訪客不儲存任何進度）。
+- 本機儲存採用 `localStorage`，透過 `js/core/db.js` 封裝。密碼使用加鹽（Salt）+ SHA-256 雜湊處理（僅限本機層級儲存）。
+- 再次打開遊戲時自動記住登入狀態。
 
-### 2.4 Ranking
-- Tiempo aguantado. Pestañas **Solo / Grupo**; periodos **diario, semanal,
-  mensual, anual e histórico** (hora de España); **todos o sólo amigos**;
-  **filtro por Pokémon**; tu puesto abajo aunque no salgas en el top 50.
-- Una entrada por jugador (o equipo) y tabla, sólo si mejora. En grupo sale
-  el equipo entero en la misma fila (la sube el anfitrión).
-- Anti-trampas básico: al empezar se apunta la hora del servidor y las reglas
-  no aceptan un tiempo mayor que el tiempo real transcurrido.
+### 2.2 性格測驗
+- 8 道《寶可夢不可思議的迷宮》經典風格心理測驗；每個選項會為不同性格特質加分。
+- 分數最高的主導特質將決定系統推薦的同行夥伴，候選名單涵蓋 **29 隻初始寶可夢**：包含 1 至 9 世代的御三家夥伴 + 可達鴨 + 呆呆獸。若不喜歡推薦結果，可手動挑選其他夥伴。
 
-### 2.1 Cuentas
-- Entrar, crear cuenta o **jugar como invitado** (no se guarda nada).
-- Provisional en `localStorage` detrás de `js/core/db.js`. Contraseñas con sal +
-  SHA-256, pero es local: no es seguridad real.
-- La sesión se recuerda al reabrir el juego.
+### 2.3 多人連線合作（最多 4 人）
+- **依暱稱加入好友：** 帳號密碼註冊的使用者直接使用使用者名稱；Google 登入的使用者在初次登入時自訂唯一的遊戲暱稱（保障隱私：不公開真實姓名）。
+- **組隊房間：** 發起邀請者為房主（Host）；在線上的好友會在主選單收到組隊邀請通知。全員就緒後由房主統一啟動遊戲。
+- **網路連線架構：** 瀏覽器之間透過 WebRTC 點對點（P2P）直連（以房主為中心的星狀拓撲）；若 NAT 穿透失敗，則自動切換透過 Firebase Realtime Database 進行中繼傳輸。
+- **主從權限分配：** 房主權限主導敵人生成、地面道具掉落、全域經驗值與計時器；各客戶端負責回傳各自寶可夢的座標、生命值與攻擊發動。隊友對敵人的攻擊判定統一發送至房主端計算，隊友的攻擊視覺以半透明「幽靈影子」呈現。
+- **共享經驗值：** 全隊共享經驗池；當隊伍升級時各自選擇升級卡牌，**全員完成選卡後遊戲才會解除暫停**繼續進行。
+- **救援機制：** 生命值歸零時會倒地等待救援；隊友在其身旁停留 3 秒即可將其復活（恢復 50% 生命值）。全隊皆倒地時遊戲結束。
+- **視角導引箭頭：** 當隊友離開目前螢幕視野時，螢幕邊緣會顯示指針指向隊友方位（附帶隊友名稱與距離公尺數；若隊友倒地則顯示紅光警告）。
+- **動態難度平衡：** 敵人數量隨人數倍增至 `×(1 + 0.75·(n−1))`，敵人生命值提升至 `×(1 + 0.3·(n−1))`；隊伍獲得的經驗值分配係數除以 `(1 + 0.6·(n−1))`。
+- 多人模式下按下暫停不會中斷遊戲時間；若房主中途斷線或離開，遊戲將對全員宣告結束。
 
-### 2.2 Test de personalidad
-- 8 preguntas estilo Mundo Misterioso; cada respuesta suma puntos de rasgo.
-- El rasgo dominante decide el compañero entre los **29 iniciales**: starters de
-  las 9 generaciones + Psyduck + Slowpoke. Se puede rechazar y elegir otro.
+### 2.4 天梯排行榜
+- 排名指標為**生存時間**。具備 **單人 (Solo) / 組隊 (Co-op)** 分頁；時間維度涵蓋**每日、每週、每月、年度與歷史總榜**；可切換查看**全球玩家或僅限好友**；支援**依特定寶可夢種類篩選**。若未進入前 50 名，畫面底部仍會顯示個人目前排位。
+- 每個帳號（或隊伍）在同一榜單僅保留最高紀錄。組隊紀錄會在同一列完整顯示全員陣容（由房主統一上傳）。
+- 基礎防作弊驗證：開局時記錄伺服器時間戳記，後端規則將嚴格拒絕回傳時間大於實際經過時間的異常紀錄。
 
-## 3. Combate
+## 3. 戰鬥系統
 
-- El Pokémon **ataca solo** con el **movimiento activo** (1 de hasta 4).
-- Cambias el activo con `1`–`4` o `Q`/`E`. Moverse: `WASD` / flechas. Pausa: `Esc`.
-- Cada ataque reproduce la **animación de PMD** que toca: `Attack`, `Shoot` o `Charge`.
-- **Apuntado:** lo que te está tocando > el jefe si está a tiro > el enemigo más
-  cercano > (sin enemigos) la roca o cofre más cercano.
-- **52 movimientos** en 7 familias (proyectil, cuerpo a cuerpo, rayo, orbes,
-  nova, aura, potenciador), 5 niveles cada uno. Cubren los **18 tipos**.
-- El pool de cada Pokémon sale de sus tipos + el pool normal común.
-- Los potenciadores no hacen daño: entras, acumulas y vuelves a uno de ataque.
-  Nunca se ofrecen más de 2.
-- Al subir de nivel: **1 de 3 cartas**.
+- 寶可夢會依據當前選定的**主動招式**（最多可裝備 4 個）**自動發動攻擊**。
+- 操作切換：使用數字鍵 `1`–`4` 或鍵盤 `Q`/`E` 切換啟用招式。移動：`WASD` 或方向鍵。暫停：`Esc`。
+- 每次攻擊皆會播放對應的 **PMD 原版精靈動作動畫**：近戰 (`Attack`)、發射 (`Shoot`) 或蓄力 (`Charge`)。
+- **自動索敵優先級：** 當前正觸碰自身的敵人 > 射程內的頭目級敵人 > 距離最近的普通敵人 > (周圍無敵人時) 距離最近的岩石或寶箱。
+- **52 種招式**劃分為 7 大招式體系（投射飛行、近身肉搏、光束衝擊、軌道法球、範圍爆破、傷害光環、增益強化），每種招式具備 5 個等級，完整覆蓋全 **18 種屬性**。
+- 每隻寶可夢的可用招式池取決於其自身屬性 + 通用一般屬性招式池。
+- 增益強化類招式本身不造成傷害：切換至該招式即可疊加 Buff 效果，隨後可切換回攻擊招式繼續作戰。單局升級選卡時最多只會提供 2 個增益類招式選項。
+- 升級獎勵：**三選一卡牌**。
 
-## 4. Mundo
+## 4. 世界與場景
 
-Arena abierta e infinita, generada con ruido determinista y pintada en pixel art
-desde código (16 px por tile, ×2).
+無限開放型競技場地圖，基於確定性噪聲演算法生成，並以純程式碼繪製像素圖塊（每個 Tile 為 16 像素，放大 2 倍渲染）。
 
-| Elemento | Efecto |
+| 場景物件 | 互動機制與效果 |
 |---|---|
-| Formaciones rocosas | Bloquean a quien camina y a los proyectiles |
-| Agua | Ralentiza (×0,6 jugador, ×0,55 enemigos) |
-| Lava (bioma volcán) | Quema a quien la pisa — se puede atraer a los enemigos |
-| Árboles / cristales | Bloquean; dan cobertura contra disparos enemigos |
-| Rocas | Se rompen; sueltan XP, monedas o bayas |
-| Cofres | Se rompen; buen botín de monedas |
-| Hierba alta | Se corta con cualquier ataque; a veces suelta algo |
-| **Altar de poder** | Al tocarlo, 25 s de Furia (daño ×2), Rayo (+45% velocidad), Imán (×4) o Prisa (−40% recarga); luego se apaga |
-| **Manantial** | Cura mientras estás encima; se agota y se recarga solo en ~45 s |
-| **Cofre con candado** | Quédate 3,5 s a su lado (aunque te ataquen): monedas, 1-3 tickets (15% un ×10) y experiencia para subir un nivel |
-| **Trampas** | Veneno, pegajosa (te frena) o explosiva; saltan al pisarlas, también con los enemigos |
-| **Grieta** | Rara (cada 30 s, 14% desde el minuto 1:15; dura 45 s). Te lleva a la arena de un legendario |
+| 岩石地貌 | 阻擋步行者與投射飛行物通行 |
+| 水域 | 減緩移動速度（玩家降為 0.6 倍，敵人降為 0.55 倍） |
+| 岩漿（火山生態系） | 對踩踏者造成灼傷傷害——可將敵人誘引至岩漿上燒死 |
+| 樹木 / 水晶柱 | 障礙物阻擋移動；可用作抵擋敵方投射子彈的掩體 |
+| 普通岩石 | 可被攻擊破壞；掉落經驗值結晶、寶可幣或樹果 |
+| 寶箱 | 可被攻擊破壞；掉落豐富的寶可幣 |
+| 高草叢 | 可被任意攻擊斬斷；偶爾掉落消耗品 |
+| **力量祭壇** | 觸碰後獲得持續 25 秒的狂暴效果（傷害 ×2）、疾風（移動速度 +45%）、磁鐵（拾取範圍 ×4）或極速（冷卻時間 −40%）；隨後熄滅 |
+| **治癒泉水** | 站在泉水範圍內持續恢復生命值；耗盡後需約 45 秒重新充能 |
+| **上鎖寶箱** | 需在寶箱旁堅持停留 3.5 秒（需承受敵人圍攻）：開啟後獲得大量寶可幣、1~3 張轉蛋券（15% 機率出現 10 連抽券）及足以直接升一級的高額經驗 |
+| **陷阱** | 劇毒、黏網（大幅緩速）或爆炸陷阱；踩中即觸發，對敵人同樣有效 |
+| **時空裂縫** | 稀有事件（遊戲進行 1 分 15 秒後，每 30 秒有 14% 機率出現；持續 45 秒）。進入後將傳送至傳說的寶可夢專屬競技場 |
 
-- **Voladores, fantasmas y jefes** ignoran el terreno.
-- **3 biomas** que rotan cada 4 minutos, cada uno con su música:
-  Bosque Umbrío, Cueva Cristal, Volcán Ceniza. El cambio es un **fundido**
-  de 2,6 s entre la paleta vieja y la nueva (suelo y objetos).
-- **Grieta → arena:** zona redonda cerrada en el bioma *Grieta Distorsión*,
-  contra un **legendario** (2 min). Ganas: ticket ×10 extra, 3 tickets y
-  monedas, y vuelves donde estabas. Pierdes (caéis todos o se acaba el tiempo):
-  vuelves sin premio con el 30% de vida. Mientras, los enemigos del mapa esperan.
+- **飛行系、幽靈屬性與頭目級敵人**會無視地面地形阻擋。
+- **三大生態系**每 4 分鐘動態輪替，並各自具備專屬背景配樂：
+  幽暗森林（Bosque Umbrío）、水晶洞穴（Cueva Cristal）、火山焦土（Volcán Ceniza）。場景切換時地面與物件色盤會以 2.6 秒的時間平滑漸變交替。
+- **時空裂縫 → 傳送競技場：** 傳送至「歪曲裂縫」專屬圓形封閉競技場，與**傳說的寶可夢**展開限時 2 分鐘的極限單挑。
+  獲勝：額外獲得 10 連轉蛋券、3 張單抽券與大量金幣，並傳送回原地。
+  失敗（全體倒地或時間耗盡）：無獎勵並以 30% 殘血傳送回主地圖。挑戰期間主地圖的時間與敵人處於暫停等待狀態。
 
-### 4.0 Arenas de la grieta (una por tipo)
-El legendario te espera en la arena de **uno de sus dos tipos, al azar**. Cada
-arena tiene su paleta, su decoración, su terreno y su clima, y suena un tema
-propio ("rift"). El legendario choca con paredes y columnas como tú y no puede
-salir del círculo.
+### 4.0 時空裂縫屬性專屬競技場（共 18 種）
+傳說的寶可夢將隨機挑選其**兩種屬性之一**作為主場競技場。每個競技場具備專屬色調、地貌、氣候與戰鬥曲目（"rift"）。傳說寶可夢與玩家同樣會被石柱與牆面阻擋，且無法越出圓形邊界。
 
-| Tipo | Arena | Terreno | Clima |
+| 屬性 | 競技場名稱 | 地形特性 | 常駐氣候 |
 |---|---|---|---|
-| Normal | Pradera Eterna | columnas | — |
-| Fuego | Volcán Ígneo | ríos de lava (quema) | sol |
-| Agua | Gruta Marina | charcos (frenan) | lluvia |
-| Planta | Selva Esmeralda | ciénaga (frena mucho), árboles | — |
-| Eléctrico | Central Voltio | charcos con descarga | lluvia |
-| Hielo | Glaciar Eterno | placas de hielo (resbalas) | nieve |
-| Lucha | Dojo Ancestral | muchas columnas | — |
-| Veneno | Ciénaga Tóxica | charcos de veneno | — |
-| Tierra | Desierto Rojo | arenas movedizas | arena |
-| Volador | Pico Celeste | árboles-nube | — |
-| Psíquico | Templo Mental | cristales rosas, columnas | — |
-| Bicho | Bosque Colmena | ciénaga, mucha hierba | — |
-| Roca | Cantera Antigua | muchas columnas y rocas | arena |
-| Fantasma | Cementerio Sombrío | árboles muertos | niebla |
-| Dragón | Santuario Dragón | llamas dracónicas (queman) | — |
-| Siniestro | Callejón Oscuro | columnas | — |
-| Acero | Fortaleza de Acero | muchas columnas | — |
-| Hada | Bosque Encantado | árboles rosas, fuentes | — |
+| 一般 | 永恆草原 | 聳立石柱 | — |
+| 火 | 烈焰火山 | 岩漿河（踩踏灼傷） | 晴天 |
+| 水 | 深海石窟 | 泥濘積水（大幅減速） | 雨天 |
+| 草 | 翡翠雨林 | 劇毒沼澤（減速嚴重）、茂密樹叢 | — |
+| 電 | 雷鳴發電廠 | 帶電水窪（觸碰麻痺受傷） | 雨天 |
+| 冰 | 永凍冰原 | 光滑冰面（打滑失控） | 雪天 |
+| 格鬥 | 遠古道館 | 密集環形石柱陣 | — |
+| 毒 | 劇毒泥潭 | 劇毒池塘（持續毒傷） | — |
+| 地面 | 赤紅荒漠 | 流沙陷阱（牽引減速） | 沙暴 |
+| 飛行 | 天空之巔 | 雲朵樹叢遮擋視野 | — |
+| 超能力 | 心靈神殿 | 粉色水晶柱陣列 | — |
+| 蟲 | 蜂巢巨林 | 泥炭地、高密雜草叢 | — |
+| 岩石 | 遠古採石場 | 密集岩石巨柱 | 沙暴 |
+| 幽靈 | 幽魂墓園 | 枯萎巨木殘骸 | 濃霧 |
+| 龍 | 龍神祭壇 | 龍炎餘燼（灼傷） | — |
+| 惡 | 暗夜窄巷 | 陰影石壁迴廊 | — |
+| 鋼 | 鋼鐵堡壘 | 堅固金屬立柱 | — |
+| 妖精 | 妖精秘境 | 粉色花樹、奇蹟湧泉 | — |
 
-Inmunidades al terreno: Fuego a la lava, Veneno/Acero al veneno,
-Eléctrico/Tierra a la descarga, Hielo al hielo. El legendario no sufre su arena.
+地形免疫機制：火屬性免疫岩漿灼傷；毒/鋼屬性免疫毒池；電/地面屬性免疫帶電水窪；冰屬性免疫冰面打滑。傳說的寶可夢不受其專屬競技場的負面地形影響。
 
-### 4.1 Climas (evento raro)
-Desde el minuto 2, cada minuto hay un 18% de que llegue un clima (~1 minuto):
+### 4.1 天氣系統（隨機氣候事件）
+遊戲進行至第 2 分鐘起，每分鐘有 18% 機率降臨隨機天氣（持續約 1 分鐘）：
 
-| Clima | Efecto |
+| 天氣 | 戰鬥影響效果 |
 |---|---|
-| Sol abrasador | Fuego ×1,5 · Agua ×0,5 |
-| Lluvia | Agua ×1,5 · Eléctrico ×1,2 · Fuego ×0,5 |
-| Tormenta de arena | Roca, Tierra y Acero ×1,3; el resto pierde un 1,2% de vida cada 2 s (nunca KO) |
-| Nevada | Hielo ×1,5; el resto pierde vida igual y va un 10% más lento |
-| Niebla | Fantasma, Hada y Psíquico ×1,3; la viñeta se cierra un poco |
+| 晴天（烈日） | 火屬性傷害 ×1.5 · 水屬性傷害 ×0.5 |
+| 雨天（大雨） | 水屬性傷害 ×1.5 · 電屬性傷害 ×1.2 · 火屬性傷害 ×0.5 |
+| 沙暴 | 岩石、地面與鋼屬性傷害 ×1.3；其餘屬性每 2 秒損失 1.2% 當前生命（不致死） |
+| 雪天 | 冰屬性傷害 ×1.5；其餘屬性同樣持續失血並降低 10% 移動速度 |
+| 濃霧 | 幽靈、妖精與超能力屬性傷害 ×1.3；畫面暗角視野輕微縮小 |
 
-Afecta a todos (tú y los enemigos). Cada bioma prefiere unos climas. Lo visual
-es suave: tinte leve y pocas partículas pixel. En grupo lo decide el anfitrión.
+天氣效果對場上所有實體（玩家與敵人）同時生效。不同生態系具備不同的天氣偏好權重。多人連線時由房主端統一決定天氣。
 
-### 4.2 Tabla de tipos (suavizada)
-La de los juegos, pero ×1,6 / ×0,6 / ×0,3 en vez de ×2 / ×0,5 / ×0 (con un
-solo ataque activo, una inmunidad total dejaría enemigos imposibles). Dos
-tipos se multiplican, con tope ×0,3–×2,4. Tus ataques usan el tipo del
-movimiento; los enemigos, su tipo principal (o el de su disparo). Número
-amarillo cuando es muy eficaz; gris si no (sin texto, para no cargar la pantalla).
+### 4.2 屬性相剋機制（平衡優化版）
+採用原作屬性相剋規則，但倍率調整為 **×1.6 / ×0.6 / ×0.3**（取代原作的 ×2 / ×0.5 / ×0；因玩家單次僅能啟用 1 個主動攻擊招式，若完全無效免疫將導致遊戲無法推進）。雙屬性複合計算，倍率上限鎖定在 ×0.3 至 ×2.4 之間。玩家攻擊依據招式屬性計算；敵人攻擊依據其主屬性計算。效果絕佳時顯示黃色傷害數字，效果不佳時顯示灰色數字（省略文字提示以保持畫面整潔）。
 
-## 5. Enemigos
+## 5. 敵人設計
 
-- **De todas las generaciones.** 6 tramos por total de stats base; en cada run se
-  sortea un elenco de 7 Pokémon por tramo, así cada partida es distinta.
-- IA según tipos: persecución, embestida telegrafiada (`Charge` → `Attack`),
-  disparo a distancia o tanque.
-- **5 jefes** (min. 3, 6, 9, 12, 15): Pokémon fuertes **no legendarios**
-  (pseudolegendarios, Slaking...) al azar, cada vez más fuertes; cada uno suelta
-  un **ticket ×10**. Los legendarios sólo salen en las grietas. Durante un combate de jefe las oleadas bajan al 25%, no
-  hay mareas y suena el tema de jefe.
-- Mareas cada ~45 s. Tope de **280** enemigos a la vez; al llegar al tope, los
-  que siguen saliendo son élite (×1,6 vida y experiencia, ×1,25 daño).
-- **Pathfinding:** campo de distancias (BFS) alrededor de cada jugador; los que
-  caminan rodean rocas, paredes y charcos peligrosos. Sólo vuelan por encima
-  los que **flotan en su sprite** (`hv` en sprites-meta, tools/hover_flags.py):
-  Rowlet o Pidgey caminan aunque sean Voladores; Gastly o Zubat flotan.
+- **涵蓋全世代寶可夢：** 依種族值總和劃分為 6 個梯隊強度；每局遊戲從各梯隊隨機抽取 7 隻寶可夢組成該局的敵人名單，確保每場探險體驗皆不相同。
+- **依屬性分配行為 AI：** 追蹤接近、直線蓄力衝刺 (`Charge` → `Attack`)、遠程彈幕射擊或重裝肉盾阻擋。
+- **5 場頭目戰（第 3、6、9、12、15 分鐘）：** 隨機遭遇強力非傳說寶可夢（如大器晚成寶可夢、請假王等），隨時間推進數值大幅飆升；擊敗頭目必掉落 **10 連轉蛋券**。傳說的寶可夢僅會在時空裂縫中出現。頭目戰期間普通怪群生成頻率降至 25%，暫停怪物潮波次，並切換為專屬 Boss 戰鬥配樂。
+- 怪物潮每約 45 秒湧現一次。同屏敵人上限為 **280 隻**；當達到上限時，後續刷出的敵人將自動晉升為菁英怪（生命值與經驗值 ×1.6，傷害 ×1.25）。
+- **尋路系統（Pathfinding）：** 以每位玩家為中心建立廣度優先搜尋（BFS）距離場；步行怪會繞開岩石、障礙牆面與危險水窪。只有精靈圖中標記為「懸浮空中」的寶可夢（元數據 `hv` 標籤，如木木梟與波波走地面，而鬼斯與超音蝠則為懸浮）才會直接穿越地形障礙。
 
-### 5.1 Personalidades
-En cada run, cada tramo de enemigos trae al menos 2 con personalidad (1 en el
-primero, para ir aprendiendo). Los ataques "con aviso" se ven antes en el suelo.
+### 5.1 敵人性格與特殊技能
+每場探險中，各梯隊至少會包含 2 隻具備特殊性格技能的敵人。地面預警圈會提前標示危險範圍：
 
-| Personalidad | Quién | Qué hace |
+| 特殊性格 | 代表寶可夢範例 | 行為機制與威脅 |
 |---|---|---|
-| Curandero | Chansey, Blissey, Audino, Clefairy... | Cura un 15% a los de alrededor cada 3,5 s |
-| Escudo | Shuckle, Bronzong, Mr. Mime, Bastiodon... | Escudo del 35% de vida a 6 compañeros |
-| Invocador | Nidoqueen, Vespiquen, Golbat, Gyarados... | Llama a 2 de su manada (Nidoran, Combee...) |
-| Kamikaze | Voltorb, Electrode, Koffing, Geodude... | Se acerca y explota (aviso de 1 s) |
-| Rayo | Eléctrico, Psíquico, Dragón, Hielo (algunos) | Rayo con franja de aviso |
-| Zonas | Fuego, Tierra, Veneno (algunos) | Círculos bajo tus pies que estallan |
-| Abanico | Agua, Planta, Bicho, Hada (algunos) | 3 disparos en abanico (5 más adelante) |
-| Saltador | Lucha, Tierra, Normal, Roca (algunos) | Salta y cae donde estabas |
+| 治癒者 | 吉利蛋、幸福蛋、差不多娃娃、皮皮… | 每 3.5 秒為周圍敵人恢復 15% 生命值 |
+| 護盾守護者 | 壺壺、青銅鐘、魔牆人偶、護城龍… | 為周遭 6 名同伴賦予相當於 35% 生命值的護盾 |
+| 召喚者 | 尼多后、蜂女王、大嘴蝠、暴鯉龍… | 召喚 2 隻族群小怪（尼多蘭、三蜜蜂…）協同作戰 |
+| 自爆特攻 | 霹靂電球、頑皮雷彈、瓦斯彈、小拳石… | 接近玩家並在 1 秒預警後自爆造成毀滅性範圍傷害 |
+| 貫穿雷擊 | 電屬性、超能力、龍、冰屬性部分寶可夢 | 發射帶有矩形預警軌跡的穿透光束 |
+| 爆破地雷 | 火、地面、毒屬性部分寶可夢 | 在玩家腳底召喚定時引爆的傷害圓圈 |
+| 扇形擴散射擊 | 水、草、蟲、妖精屬性部分寶可夢 | 呈扇形向前方射出 3 發（後期 5 發）能量彈 |
+| 泰山壓頂 | 格鬥、地面、一般、岩石屬性部分寶可夢 | 躍向空中並猛烈砸向玩家當前所在位置 |
 
-## 6. Shinies
+## 6. 異色寶可夢（Shiny）
 
-- **Salvajes:** cada enemigo tiene **1/4096** de salir shiny (también los jefes).
-  Brilla, tiene el doble de vida, da ×5 de experiencia, no desaparece aunque te
-  alejes y una flecha en el borde de la pantalla te indica dónde está.
-  **Si lo derrotas, te lo quedas** (y la versión normal si no la tenías). Si ya
-  tenías ese shiny, +300 monedas.
-- **Gacha:** 1 de cada 100 tiradas sale shiny. Shiny repetido = triple de monedas.
-- **Colección:** en la ficha de un Pokémon cuyo shiny tienes hay un selector
-  **Normal / Shiny**; eliges compañero en la versión que quieras.
-- 958 de los 966 Pokémon tienen sprite shiny auténtico de SpriteCollab.
+- **野外遭遇：** 每隻生成的敵人皆有 **1/4096** 的機率成為異色寶可夢（包含頭目級敵人）。
+  異色敵人帶有專屬閃光特效、生命值翻倍、提供 5 倍經驗值、離開視野絕不消失，且螢幕邊緣會出現閃爍指針導引方位。
+  **將其擊敗即可直接收服入庫**（若先前未擁有該寶可夢的普通形態，將一併解鎖收服）。若已擁有該異色寶可夢，則補償發放 300 枚寶可幣。
+- **轉蛋抽取：** 轉蛋卡池中出現異色形態的機率為 1/100。重複抽中異色形態給予 3 倍金幣返還。
+- **收藏與切換：** 在寶可夢詳細資訊頁面中，若已解鎖異色版本，可自由在 **一般 / 異色** 形態間切換，並直接攜帶出戰。
+- 全作 966 隻寶可夢中，共有 958 隻擁有來自 SpriteCollab 的正統異色精靈圖。
 
-## 7. Progresión
+## 7. 數值與成長進度
 
-### 7.1 Pokémonedas
-Al terminar una run: `tiempo/5 + derrotados/4 + 80 por jefe + monedas recogidas`,
-multiplicado por la mejora Fortuna. Cuenta nueva: 500 de regalo.
+### 7.1 寶可幣（金幣）
+結算公式：`存活秒數 / 5 + 擊倒數量 / 4 + 擊倒頭目數 × 80 + 局內拾取金幣`，並受到「招財」被動天賦加成。註冊新帳號即贈送 500 啟動金幣。
+金幣專門用於購買**能力強化**；轉蛋卡池則專門消耗轉蛋券。
 
-Las monedas sirven para las **mejoras**; el gacha va con tickets.
+### 7.2 永久能力強化（各寶可夢獨立計算）
+包含：體力、力量、疾步、迅捷、鐵壁、光合、磁力、博學、招財，以及**備用招式槽（開局直接自選配備 2 個招式）**。每隻寶可夢擁有各自獨立的強化樹，僅在指派該寶可夢出戰時生效。
 
-### 7.2 Mejoras permanentes — de cada Pokémon
-Vitalidad, Fuerza, Zancada, Reflejos, Coraza, Síntesis, Imán, Sabiduría, Fortuna
-y **Repertorio (empezar con 2 movimientos)**. Cada Pokémon tiene las suyas y
-sólo cuentan cuando juegas con él (en la pantalla de Mejoras se elige cuál).
-Las que se compraron cuando eran de la cuenta pasaron al compañero de entonces.
+### 7.2a 局內攜帶裝備道具（每局限裝備 1 件）
+包含：剩飯、講究頭帶、先制之爪、氣勢披帶、貝殼之鈴、護符金幣、幸運蛋、生命寶珠、講究圍巾、凸凸頭盔、突擊背心。
+由**所有頭目級怪物必定掉落**，上鎖寶箱有 50% 機率開出，普通寶箱有 8% 機率開出。若已攜帶道具，可在拾取時進行替換（單人模式下遊戲會自動暫停以供決策）。
 
-### 7.2a Objetos equipables (uno por run)
-Restos, Cinta Elección, Garra Rápida, Banda Focus, Cascabel Concha, Moneda
-Amuleto, Huevo Suerte, Vidasfera, Pañuelo Elección, Casco Dentado y Chaleco
-Asalto. Los sueltan **todos los jefes**, los cofres con candado (50%) y a veces
-los normales (8%). Si ya llevas uno, eliges (en solitario el juego se para).
+### 7.2c 招式超進化系統
+當主動招式升級至最高等級（Lv.5）且在該局中持有對應的屬性共鳴被動時（例如：火花 + 力量 → 大字爆炎；泡沫 + 疾步 → 衝浪），升級卡牌必定開出**超進化黃金卡牌**。全作 47 種攻擊招式皆具備超進化形態。
 
-### 7.2c Evolución de movimientos
-Un movimiento al nivel máximo evoluciona si en esa run has cogido su mejora de
-condición (Ascuas + Potencia → Llamarada, Burbuja + Carrera → Surf...): sale
-una **carta dorada** (siempre, si está lista). Los 47 de ataque evolucionan.
+### 7.2d 任務、成就與個人名片
+- **3 個每日任務 + 2 個每週任務**（獎勵轉蛋券與寶可幣）；每天允許免費重置 1 個每日任務。基於帳號種子計算，在不同設備登入任務完全一致。
+- **成就系統**：劃分為銅牌、銀牌、金牌等級，達成後發放轉蛋券與專屬稱號；在時空裂縫中每討伐一隻**傳說的寶可夢**即可解鎖對應專屬成就。
+- **公開個人資料頁**（可透過排行榜或好友列表點閱）：展示 3 隻代表代表寶可夢、裝飾稱號、最佳探險紀錄以及 8 枚最高榮譽獎章。
 
-### 7.2d Misiones, logros y perfil
-- **3 diarias + 2 semanales** (premio en tickets y monedas); una diaria se puede
-  cambiar al día. Mismas misiones en cualquier ordenador (semilla por cuenta).
-- **Logros** con medalla (bronce, plata, oro), premio y a veces **título**;
-  uno por cada **legendario** vencido en una grieta.
-- **Perfil público** (desde el ranking o la lista de amigos): 3 favoritos,
-  título, mejores marcas y las 8 mejores medallas.
+### 7.2b 轉蛋券獲取來源
+- **單抽券 (Ticket ×1)：** 擊殺任意野生寶可夢有 1/400 機率掉落；開啟上鎖寶箱掉落 1~3 張。
+- **十連抽券 (Ticket ×10)：** 擊殺頭目級怪物必定掉落；在時空裂縫中戰勝傳說寶可夢掉落 2 張；開啟上鎖寶箱有微小機率開出。
+- 多人模式下掉落的轉蛋券歸全隊共有：任一人拾取，全員皆同步獲取。
 
-### 7.2b Tickets del gacha
-- **Ticket** (×1): cada Pokémon derrotado tiene 1/400 de soltar uno; los cofres
-  con candado dan 1-3.
-- **Ticket ×10**: los jefes, el legendario de la grieta (2) y, a veces, los
-  cofres con candado.
-- En grupo los tickets son del equipo: todos se llevan los que se recogen.
+### 7.3 轉蛋抽卡——9 大地區專屬卡池
+分為關都、城都、豐緣、神奧、合眾、卡洛斯、阿羅拉、伽勒爾與帕底亞共 9 個卡池，每個卡池擁有**該地區專屬寶可夢名單、3 隻當期機率提升 UP 角色以及獨立保底計數**。
 
-### 7.3 Gacha — un banner por región
-Kanto, Johto, Hoenn, Sinnoh, Teselia, Kalos, Alola, Galar y Paldea, cada uno con
-**sus Pokémon, sus 3 destacados y su propio pity**.
-
-| Rareza | Prob. | Repetido devuelve |
+| 稀有度 | 抽取機率 | 重複抽取返還金幣 |
 |---|---|---|
-| Común | 45% | 15 |
-| Poco común | 30% | 30 |
-| Rara | 17% | 60 |
-| Épica | 6,5% | 120 |
-| Legendaria | 1,5% | 300 |
-| *Shiny* | *1% (cualquier rareza)* | *×3* |
+| 普通 (Common) | 45% | 15 |
+| 罕見 (Uncommon) | 30% | 30 |
+| 稀有 (Rare) | 17% | 60 |
+| 史詩 (Epic) | 6.5% | 120 |
+| 傳說 (Legendary) | 1.5% | 300 |
+| *異色形態 (Shiny)* | *1% (全稀有度皆可能出)* | *×3* |
 
-- Tirada ×1: 1 ticket · ×10: **10 tickets normales o 1 ticket ×10** (dos botones,
-  eliges con qué pagar), con **al menos una
-  Épica** garantizada. Los repetidos siguen dando monedas.
-- **Animación: tragaperras pixel art** (palanca, 3 rodillos, bombillas). Los
-  símbolos son la rareza: Poké, Super, Ultra, Lujo y Master Ball
-  (Legendaria) y la estrella roja (shiny); con Épica o mejor el último rodillo se hace
-  esperar. La ×10 son 10 tiradas rápidas que caen a la bandeja. Clic = acelerar.
-- **Pity:** a las 70 tiradas sin Legendaria en un banner, la siguiente lo es.
-- Algunas regiones tienen rarezas casi vacías (Galar sólo tiene 4 Poco comunes);
-  si una rareza no tiene Pokémon en ese banner, sale la más cercana.
+- 單抽消耗 1 張單抽券；十連抽可自由選擇消耗 **10 張單抽券 或 1 張十連抽券**，且**十連抽必定保底獲得至少 1 隻史詩或以上角色**。
+- **復古拉霸機動畫：** 像素風搖桿拉霸機，轉輪圖示採用對應稀有度的寶可球：精靈球、超級球、高級球、豪華球與大師球（傳說級），以及紅星（異色）；若中獎史詩以上稀有度，最後一格轉輪會進行慢速懸念懸停。點擊螢幕可跳過動畫。
+- **保底機制：** 連續 70 次未抽出傳說級角色，下一次抽取必定開出傳說級角色。
 
-## 8. Música y sonido
+## 8. 音樂與音效架構
 
-Compuesto para el juego y tocado por un sintetizador Web Audio (flauta, marimba,
-guitarra punteada, bajo, pad, lead y batería, con reverb). Cero ficheros.
+全作配樂專為本遊戲創作，並完全由 Web Audio API 振盪器與濾波器即時合成（包含長笛、馬林巴木琴、木吉他撥弦、低音貝斯、合成背景音墊、主奏合成器與打擊樂器，並輔以卷積殘響效果），**不依賴任何外部 MP3/OGG 檔案**。
 
-| Tema | Dónde | Estilo |
+| 曲目名稱 | 播放場合 | 調性與風格架構 |
 |---|---|---|
-| Aldea | Menús | Fa mayor, 100 bpm con swing, flauta y marimba |
-| Bosque | Run (bosque) | Re menor aventurero, 122 bpm |
-| Cueva | Run (cueva) | La menor misterioso, 92 bpm, campanitas |
-| Volcán | Run (volcán) | Mi frigio tenso, 132 bpm |
-| Jefe | Combate de jefe | Mi menor intenso, 150 bpm |
+| 村莊 (Aldea) | 主選單 | F 大調，100 BPM 搖擺節奏，長笛與馬林巴木琴主旋律 |
+| 森林 (Bosque) | 森林生態系冒險 | D 小調冒險風格，122 BPM |
+| 洞窟 (Cueva) | 水晶洞穴冒險 | A 小調空靈神秘，92 BPM，清脆鈴鐺點綴 |
+| 火山 (Volcán) | 火山焦土冒險 | E 弗里吉亞調式（Phrygian），132 BPM 緊張節奏 |
+| 頭目戰 (Jefe) | 頭目對決 | E 小調激烈交鋒，150 BPM 高昂戰意 |
 
-- Efectos para botones, cada familia de ataque (con tono según el tipo),
-  golpes, caídas, experiencia (sube de tono en racha), monedas, nivel, jefe,
-  shiny, roturas, gacha (caída, sacudidas, estallido según rareza).
-- Volumen de música y efectos y botón de silencio en la barra superior y en la
-  pausa; se recuerda en el navegador.
-- Medido: los 5 temas a la par (RMS 0,075–0,09), sin saturar ni con jefe + combate.
+- 完整支援按鈕點擊、各屬性攻擊音效、受傷、倒地、連鎖經驗值音調攀升、金幣掉落、升級、頭目現身、異色遭遇以及轉蛋拉霸音效。
+- 嚴格校準音軌動態平衡（均方根振幅 RMS 穩定在 0.075–0.09 區間），高負載同屏混音時絕不發生破音或失真。
 
-## 9. Interfaz
+## 9. 使用者介面（UI）
 
-- **Sin emojis.** Iconos pixel art dibujados en código (`js/ui/icons.js`):
-  cada movimiento lleva el **emblema de su tipo** (18) + una **insignia de su
-  familia**; más corazón, guante, bota, reloj, escudo, brote, imán, libro,
-  moneda, cartas, baya, bomba, estrella, destello shiny, corona, Poké Ball…
-- Siempre a múltiplos enteros de su resolución, para que el píxel quede nítido.
+- **完全剔除系統 Emoji：** 全部圖示皆透過純程式碼像素點陣繪製（`js/ui/icons.js`）：每個招式均包含其 **18 種屬性徽記** + **招式體系標誌**；輔以心臟、手套、鞋子、時鐘、盾牌、嫩芽、磁鐵、書籍、金幣、卡牌、樹果、炸彈、星星、異色閃光、王冠與各等級寶可球。
+- 繪製時一律採用像素整數倍放大，確保在各種解析度螢幕上皆呈現銳利清晰的復古像素質感。
 
-## 10. Técnica
+## 10. 技術規範
 
-- HTML + CSS + JavaScript vanilla sobre Canvas 2D. Sin build, sin dependencias.
-- **Sprites:** [SpriteCollab](https://github.com/PMDCollab/SpriteCollab), 966
-  Pokémon × 7 animaciones × 8 direcciones, normal y shiny, en `assets/pokemon/`
-  (76 MB, PNG con paleta sin pérdida). **CC BY-NC 4.0: uso no comercial y
-  atribución** (114 artistas en `CREDITS.md`).
-- **Datos:** stats y nombres en español bajados **una vez** de PokeAPI.
-- **Fuente:** Pixelify Sans (OFL).
-- Los ficheros generados se rehacen con los scripts de `tools/`.
-
-## 11. Pendiente
-
-- [ ] Efectividades de tipo en el daño
-- [ ] Gráficos propios para los proyectiles (ahora son orbes de color)
-- [ ] Movimientos propios por Pokémon (ahora salen de sus tipos)
-- [ ] Controles táctiles / mando
-- [ ] 59 Pokémon sin sprite en SpriteCollab (sobre todo gen 5, 8 y 9)
+- 純前端原生技術棧：HTML5 + CSS3 + 原生 JavaScript 搭配 Canvas 2D 渲染。無打包構建、無外部函式庫依賴。
+- **精靈圖資源：** 源自 [SpriteCollab](https://github.com/PMDCollab/SpriteCollab)，966 隻寶可夢 × 7 組動作動畫 × 8 個面向方向，全量收錄一般與異色版本於 `assets/pokemon/` 目錄中（總計 76 MB，無損索引調色盤 PNG 格式）。**CC BY-NC 4.0：非商業使用與作者署名**（共計 114 位像素畫家，名單詳見 `CREDITS.md`）。
+- **字型：** 採用 Pixelify Sans 開源像素字體（OFL 授權）。
+- 自動化維護腳本集中於 `tools/` 目錄下。
 
 ---
 
-## Registro de decisiones
+## 決策修訂歷史記錄
 
-**2026-10-07 · primera versión**
-- Stack vanilla + Canvas. 1 movimiento activo que se cambia con 1–4. Combate primero.
+*(詳細歷史決策依照版本演進記錄於下方)*
 
-**2026-10-07 · segunda versión**
-- Todo en local: fuera la API en tiempo de ejecución.
-- Sprites de Mundo Misterioso (SpriteCollab) con animaciones de ataque.
-- Tiles pintados en código (los de PMD sólo existen ripeando la ROM).
-- Mapa: **arena abierta con obstáculos** (no salas y pasillos estrictos de PMD).
-- Guardado: `localStorage` detrás de una capa de datos única.
+**2026-10-07 · 初始版本發布**
+- 確立 Vanilla JS + Canvas 2D 架構。單一主動招式，透過數字鍵 1–4 切換。
 
-**2026-10-07 · tercera versión**
-- **Todas las generaciones** (966 con sprite). Gacha: **un banner por región**.
-- **Shinies:** 1/4096 salvaje, 1/100 en gacha; el compañero se elige en versión
-  normal o shiny desde la colección.
-- **Música compuesta en código** (no se puede usar la de Nintendo) + efectos.
-- **Fuera los emojis**: iconos pixel art propios.
+**2026-10-07 · 第二版更新**
+- 移除運行時外部 API 呼叫，實現完全本機單機化運行。
+- 整合 SpriteCollab《不可思議的迷宮》精靈圖與動作幀。
+- 確定開放式障礙物競技場地圖設計。
 
-**2026-10-07 · arreglo de combate**
-- Bug: los proyectiles nacían en el borde del Pokémon y avanzaban hasta 8 unidades
-  por fotograma, así que **los enemigos pegados al jugador eran inmunes** a todos
-  los movimientos de proyectil (en un survivor, casi siempre hay alguno pegado).
-  Ahora nacen en el centro y la colisión es barrida (todo el tramo del fotograma).
-  En la simulación de 10 min se pasó de 0 a 1 jefe derrotado por partida.
-- Vídeos de demostración en `videos/` (jefe, shiny salvaje, shiny en el gacha).
+**2026-10-07 · 第三版更新**
+- 收錄全 9 世代共 966 隻寶可夢，轉蛋劃分各地區專屬卡池。
+- 導入異色形態機制：野外 1/4096，卡池 1/100；支援在收藏庫自由切換出戰形態。
+- 原創純程式碼 Web Audio 合成背景配樂與音效。
 
-**2026-10-07 · efectos y retoques visuales**
-- **Ataques con sprites pixel art** (`js/entities/vfx.js`): 23 formas (llama,
-  gota, burbuja, hoja, rayo, cristal, roca, lodo, aguijón, estrella, viento,
-  telaraña, onda, media luna, sonido, impacto, zarpazo, mandíbulas, flecha,
-  esfera, bola sombra, corazón...) pintadas con la paleta de cada tipo y con
-  contorno como los sprites de PMD. Rayos como chorros (llamas, agua, zigzag
-  eléctrico, cristales), golpes como medialuna pixelada con extra (mandíbulas,
-  zarpazo, impacto, hojas/plumas), auras y potenciadores con partículas del
-  tipo, estelas (ascuas, gotas, burbujas de veneno, polvo...). Los disparos
-  enemigos usan el tipo del enemigo y llevan un aro rojo en el suelo.
-- **Mismo tamaño de píxel en toda la interfaz** (×2): los legendarios grandes
-  parecían de otro estilo porque se dibujaban a ×1. Los jefes, en múltiplos de 0,5.
-- **Shiny:** gema pixel art como marca y centelleos de píxeles animados.
-- **Compañero del menú:** recuadro oscuro con borde del color de su tipo.
-- **Apuntado:** los ataques a distancia priorizan al jefe; los cuerpo a cuerpo,
-  lo que tienes pegado.
+**2026-10-08 · 連線合作、好友與排行榜**
+- 支援最多 4 人合作闖關，採用 WebRTC P2P 連線直連架構。
+- 共享經驗值與全員等待選卡機制；隊友倒地救援系統。
+- 全球存活天梯排行系統上線。
 
-**2026-10-07 · base de datos y publicación**
-- **Firebase** (Authentication + Firestore): cuentas con nombre + contraseña o
-  Google; la partida se sigue en cualquier ordenador. Copia local para jugar
-  sin conexión, escucha en tiempo real de otros ordenadores y **fusión** al
-  sincronizar (colecciones unidas, máximos en mejoras/estadísticas, monedas y
-  compañero de la versión más reciente). Reglas: cada jugador sólo accede a
-  `saves/{su uid}`. Las cuentas locales antiguas se suben al entrar con el
-  mismo nombre y contraseña. Probado con el emulador oficial en dos navegadores.
-- Sin configuración o abierto con doble clic, sigue en modo local.
-- **Aviso legal y privacidad** con contacto para retirar contenido y botón
-  para borrar la cuenta. Código abierto (MIT) en GitHub (JPTER78).
-- Medidas que NO se aplican a petición: renombrar sin "Pokémon" y quitar los
-  sprites ripeados de los juegos (los de CHUNSOFT).
+**2026-10-08 · 天氣、屬性相剋與時空裂縫**
+- 導入隨機動態氣候事件（晴天、雨天、沙暴、雪天、濃霧）。
+- 平衡化屬性剋制倍率（×1.6 / ×0.6 / ×0.3）。
+- 實裝時空裂縫與 18 種屬性專屬傳說競技場挑戰。
 
-**2026-10-08 · nuevo nombre**
-- El juego pasa a llamarse **PokéSurvivor** (sin "Pokémon" en el nombre, como
-  PokéRogue o Showdown). Repositorio: `pokesurvivor`.
-- Firebase: proyecto nuevo **`pokesurvivor-jpter`** (Firestore en eur3, correo/
-  contraseña y Google activos, dominios `jpter78.github.io` y `localhost`). Los
-  proyectos `pokemon-survivors-jpter` y `asdaad-9e84f` se borraron (30 días
-  recuperables en Google Cloud).
-
-**2026-10-09 · móvil y ajustes**
-- **Jugable en móvil y tablet, en horizontal** (en vertical sale "Gira el
-  móvil" y la partida se pausa). **Joystick flotante**: aparece donde pones el
-  dedo. Los iconos de ataque se tocan para cambiarlo (en PC también con clic) y
-  hay botón de pausa. Al cambiar de app, la partida se pausa sola.
-- La cámara asegura un alto mínimo de mundo en pantallas muy anchas.
-- Interfaz compacta en pantallas bajas (menú en dos columnas, barra superior
-  pequeña, la línea de créditos pasa a Ajustes → Acerca de).
-- **Ajustes** (PC y móvil): sonido; gráficos (calidad Auto/Alta/Media/Baja,
-  números de daño, menos sacudidas y destellos, FPS, pantalla completa);
-  controles (tamaño del joystick, teclas); cuenta (apodo fijo, nube, cerrar
-  sesión, borrar); acerca de (versión, créditos, aviso legal, contacto).
-- **Calidad automática**: baja efectos si el juego va a menos de 45 FPS.
-- **Instalable como app** (PWA: icono, pantalla completa, abre sin conexión).
-- Arreglos: el orbe extra de los movimientos de órbita al mejorarlos; sonido
-  que no arrancaba en móvil; los invocadores respetan el tope de enemigos;
-  aviso claro si un archivo del juego no llega a cargar.
-
-**2026-10-09 · gastar lo mínimo de Firebase (plan gratuito)**
-- **Ranking con resumen**: un documento `lbs/{tabla}` con el top 50 por
-  tabla (1 lectura por pestaña en vez de ~52) y caché de 10 min en el
-  navegador; las marcas propias se recuerdan para no leer antes de escribir.
-  El filtro por Pokémon queda **sólo en el histórico** (la mitad de escrituras).
-- **"En línea" aproximado** por Firestore (`pres/`, latido cada 10 min, se lee
-  al abrir Amigos o la sala) e **invitaciones por Firestore** (`inv/`). La
-  Realtime Database sólo se conecta dentro de una sala: el tope de 100
-  conexiones del plan gratis ya no limita a los jugadores normales.
-- **Guardado en la nube** como mucho cada 30 s (y al cerrar), sin escucha en
-  vivo del propio documento; perfil público como mucho cada 10 min.
-- Medido en el emulador: ver todo el ranking dos veces pasó de 1.275 a 20
-  lecturas; terminar una partida de 12 a 3.
-- Menos Pokémon en pantalla pero más fuertes (×0,45 de cantidad, ×2,1 vida,
-  ×1,35 daño, ×2,6 experiencia) y sin textos de "¡Muy eficaz!".
-
-**2026-10-08 · multijugador, amigos y ranking**
-- **Cooperativo hasta 4** con **lista de amigos** (no códigos de sala ni salas
-  públicas). Experiencia compartida y **cartas que esperan a todos**; un caído
-  se **revive** quedándose a su lado.
-- Conexión **WebRTC directa** con señalización por la **Realtime Database**
-  (nueva instancia `pokesurvivor-jpter-default-rtdb`, europe-west1), y **relé**
-  por esa misma base de datos si no se puede conectar directo. Sin servidor
-  propio ni TURN de pago.
-- **Apodo único** para amigos y ranking; las cuentas de Google lo eligen al
-  entrar (privacidad: no se enseña su nombre real).
-- **Ranking de tiempo aguantado**: Solo / Grupo, diario a histórico, amigos,
-  por Pokémon, tu puesto. El grupo sale entero en una fila.
-- Aviso de privacidad: en grupo los navegadores se conectan directamente y
-  pueden verse la IP (como en una videollamada).
-
-**2026-10-08 · mejoras por Pokémon, tickets, grietas e interactivos**
-- **Mejoras de cada Pokémon** (no de la cuenta); las ya compradas pasan al
-  compañero actual. Las monedas quedan sólo para mejoras.
-- **Gacha con tickets** que se ganan jugando (sin regalo inicial ni conversión
-  de monedas): ×1 de Pokémon normales (1/260), ×10 de legendarios (siempre) y jefes (1 de cada 3).
-- **Jefes casuales no legendarios**; los legendarios, sólo en las **grietas**
-  (arena aparte; perder te devuelve sin premio). En grupo viajáis todos.
-- **Altares, manantiales, cofres con candado y trampas**, en pixel art propio.
-- **Fundido** entre biomas en vez del cambio brusco.
-- Pokédex: campo `leg` (legendario o singular) de PokeAPI.
-
-**2026-10-08 · climas, tabla de tipos y tragaperras**
-- **Climas** como evento raro (sol, lluvia, arena, nieve, niebla), visual suave.
-- **Tabla de tipos suavizada** en los dos sentidos.
-- Gacha con **tragaperras pixel art** en vez de la Poké Ball.
-
-**2026-10-08 · arenas por tipo**
-- Bug: los legendarios (jefes = voladores) atravesaban las rocas de la arena y
-  no se les podía disparar (Celebi). Ahora chocan y no salen del círculo.
-- 18 arenas de grieta, una por tipo, con terreno que afecta y clima propio;
-  tema musical nuevo para la grieta.
-
-**2026-10-08 · iconos más Pokémon**
-- Shiny: **estrella roja** con destello (como la marca de shiny de los juegos),
-  en vez de la gema.
-- Rareza: ya no hay estrellas; cada rareza es su **Poké Ball** — Poké (Común),
-  Super (Poco común), Ultra (Rara), Lujo (Épica) y **Master (Legendaria)**.
-
-**2026-10-08 · cámara, rendimiento e IA**
-- Cámara un 20% más lejos (768 de ancho de mundo en vez de 640).
-- Rendimiento: el destello al golpear usaba `ctx.filter` (×95 más caro que una
-  silueta blanca precalculada, que es lo que se usa ahora); tope de 70 números
-  de daño; resolución interna ×1,5 como mucho; menos trabajo fuera de pantalla;
-  tope de 280 enemigos con élites al llegar al tope.
-- Los enemigos rodean obstáculos; vuelan sólo los que flotan en su sprite.
-
-**2026-10-08 · misiones, logros, objetos, evoluciones y enemigos con personalidad**
-- Misiones 3+2, logros con premio y título, perfil público (todos lo ven).
-- Objetos equipables de un solo uso por run (cofres y jefes).
-- Evolución de movimientos: nivel máximo + condición, carta dorada.
-- Enemigos con personalidad: curanderos, escudos, invocadores y ataques con
-  aviso (rayos, zonas, kamikazes, abanico, saltos). Ajustados con un piloto
-  automático: la supervivencia media es parecida a la de antes (89 s frente a 60 s).
-
-**2026-10-10 · últimos detalles antes de la web**
-- Los Pokémon de tipo Agua no se frenan en el agua ni en el pantano.
-- Se sube de nivel la mitad de rápido (experiencia por nivel ×2).
-- Menos enemigos a la vez (tope 64) pero bastante más duros. Los que se quedan
-  atrás mientras corres se desvanecen y vuelven a salir por delante, así no se
-  forma la cola detrás y no se puede huir sin más. Un "corredor" por tramo
-  (rápido y frágil, va a donde vas a estar).
-- Jefes y legendarios con 4 ataques avisados (pisotón, embestida o salto, y dos
-  de lejos según su tipo: lluvia de zonas, rayos en abanico, anillo o abanico
-  de disparos). Alternan entre ir a por ti y pelear de lejos, y por debajo de
-  la mitad de vida se enfurecen. Más vida (×1,35) y daño (×1,2).
-- Grietas: flecha grande que late, con distancia y tiempo, y aviso propio al
-  abrirse.
-- Pantalla "Pulsa para empezar" (el navegador no deja sonar sin tocar nada) y
-  música también en el inicio de sesión y en las preguntas de personalidad.
-- 8 formas nuevas de atacar con los mismos gráficos: bumerán, cadena, minas,
-  meteoros, torreta, embestida, rastro y abanico corto. 7 movimientos pasan a
-  ellas (mismo id) y hay 12 nuevos (64 en total).
-- Anti-trampas: el servidor rechaza nivel y derrotados imposibles para el
-  tiempo; el juego vigila reloj, vida, velocidad, ataque, nivel, monedas y las
-  herramientas de prueba. Si algo no cuadra, la partida no cuenta para el
-  ranking ni los récords.
-- Eventos a mitad de partida cada 4-5 min (systems/events.js): horda de un tipo
-  (30 s), hora dorada (30 s, doble de experiencia y monedas) y Pokémon perdido
-  (lo llevas a la marca; cura, monedas, ticket y 1 de cada 5 se une a ti).
-  Duendes del tesoro 1-2 por partida: Meowth (monedas) o Gholdengo (ticket ×10;
-  Gimmighoul no tiene sprite). Huyen y se escapan a los 15 s. En grupo, todo
-  compartido.
-- Más tarde (10-10): subir de nivel otra vez la mitad de rápido (experiencia
-  por nivel ×4 respecto al original) y tickets ×1 más raros (1/400 en vez de 1/260).
-  Misiones de nivel 8/12/15 y logros de nivel 15 y 30 (antes 12/16/20, 20 y 40).
+**2026-10-09 · 行動端適配與極簡伺服器消耗優化**
+- 支援手機與平板橫向螢幕遊玩，實裝智慧浮動虛擬搖桿與觸控介面。
+- 支援 PWA 漸進式網頁應用安裝。
+- 優化 Firebase 資料庫讀寫架構，將排行榜與狀態輪詢開銷壓縮至最低免費配額之內。

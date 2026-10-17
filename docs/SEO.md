@@ -1,90 +1,73 @@
-# SEO y dominio pokesurvivor.com
+# SEO 與 pokesurvivor.com 網域營運指南
 
-Todo lo técnico ya está preparado en el código. Falta lo que sólo puedes hacer tú
-(comprar el dominio, configurar el DNS y dar de alta la web en Google).
+所有前端技術層面的 SEO 優化已在程式碼中配置完畢。剩下的是需要手動操作的部分（購買網域、DNS 配置以及向搜尋引擎登錄網站）。
 
-## Qué hay preparado
+## 技術層面已完成的配置
 
-| Archivo | Para qué |
+| 檔案 / 目錄 | 功能與配置說明 |
 |---|---|
-| `index.html` | Título y descripción pensados para búsquedas ("juego Pokémon gratis online", "estilo Survivor.io"), dirección canónica, tarjetas para redes (Open Graph / Twitter), datos estructurados `VideoGame` (gratis, 1-4 jugadores, navegador/Android/iOS) y un texto real mientras carga (con `<h1>`). |
-| `guia/` | Guía con cómo se juega, características, consejos y **preguntas frecuentes** (con datos `FAQPage`, que Google puede enseñar desplegables en los resultados). |
-| `pokedex/` | Los 966 Pokémon jugables con sus tipos y sprites: atrae búsquedas tipo "juego con Pikachu gratis". |
-| `404.html` | Página de "no existe" con enlaces al juego (GitHub Pages la usa sola). |
-| `robots.txt` | Permite rastrear todo menos `tools/` y `docs/`, e indica el sitemap. |
-| `sitemap.xml` | Las páginas que hay que indexar. |
-| `assets/og-image.jpg` | La imagen que sale al compartir el enlace (1200×630). |
-| `manifest.webmanifest`, iconos | App instalable, icono en el navegador y en el móvil. |
+| `index.html` | 專為搜尋優化的標題與敘述（"免費線上寶可夢遊戲"、"類 Survivor.io 風格"）、標準網址 (Canonical URL)、社群分享卡片（Open Graph / Twitter Card）、`VideoGame` 結構化資料（免費、1-4人、支援瀏覽器/Android/iOS）以及載入時的友善 HTML 標題文字。 |
+| `guia/` | 新手指南頁面：包含操作教學、遊戲特色、實用技巧與**常見問題 FAQ**（配置 `FAQPage` 結構化資料，有機會在 Google 搜尋結果中呈現摺疊問答富文本摘要）。 |
+| `pokedex/` | 收錄 966 隻可遊玩寶可夢與其屬性、精靈圖：吸引搜尋「免費皮卡丘遊戲」等長尾關鍵字。 |
+| `404.html` | 具備返回遊戲連結的自訂 404 頁面（GitHub Pages 自動採用）。 |
+| `robots.txt` | 允許檢索除 `tools/` 與 `docs/` 以外的所有資源，並指向 Sitemap。 |
+| `sitemap.xml` | 完整定義待檢索收錄的頁面清單。 |
+| `assets/og-image.jpg` | 社群平台分享時的預覽大圖（1200×630）。 |
+| `manifest.webmanifest`, 圖示 | PWA 漸進式應用安裝配置、瀏覽器與行動裝置桌面高畫質圖示。 |
 
-Las páginas se regeneran con `python tools/make_seo_pages.py` (por ejemplo, si
-cambian los Pokémon o las características).
+相關靜態頁面可透過 `python tools/make_seo_pages.py` 自動重新生成（例如當寶可夢資料或特性更新時）。
 
-> **Importante:** las direcciones canónicas ya apuntan a `https://pokesurvivor.com/`.
-> No publiques estos cambios hasta que el dominio funcione, o Google intentará
-> indexar un dominio que todavía no existe.
+> [!IMPORTANT]
+> 目前標準網址（Canonical）皆已指向 `https://pokesurvivor.com/`。請確認自訂網域正式上線生效後再行全面發布，避免搜尋引擎檢索尚未解析的網域名稱。
 
-## 1. Dominio
+## 1. 網域設定
 
-Los pasos para poner en marcha pokesurvivor.com (DNS en Cloudflare, GitHub Pages,
-Firebase y el paso final) están en [DOMINIO.md](DOMINIO.md).
+啟用 pokesurvivor.com 的詳細步驟（Cloudflare DNS、GitHub Pages、Firebase 授權與上線清單）請參閱 [DOMINIO.md](DOMINIO.md)。
 
-## 2. Google Search Console (lo más importante)
+## 2. Google Search Console 提交（最關鍵）
 
-1. Entra en <https://search.google.com/search-console> con tu cuenta de Google.
-2. **Añadir propiedad → Dominio** → `pokesurvivor.com`.
-3. Google te da un registro **TXT**: añádelo en el DNS (nombre `@`) y pulsa Verificar
-   (puede tardar unos minutos).
-4. **Sitemaps** → enviar `sitemap.xml`.
-5. **Inspección de URL** → `https://pokesurvivor.com/` → **Solicitar indexación**.
-   Repite con `/guia/` y `/pokedex/`.
+1. 使用 Google 帳號登入 <https://search.google.com/search-console>。
+2. **新增資源 → 網域** → 輸入 `pokesurvivor.com`。
+3. 取得 Google 提供的 **TXT** 驗證記錄：在 Cloudflare DNS 新增（名稱填 `@`）並於 Search Console 點擊驗證。
+4. 進入 **Sitemaps** → 提交 `sitemap.xml`。
+5. 進入 **網址審查** → 輸入 `https://pokesurvivor.com/` → 點擊 **要求建立索引**。建議對 `/guia/` 與 `/pokedex/` 重複此操作。
 
-Bing (y con él DuckDuckGo y Ecosia): <https://www.bing.com/webmasters> → "Importar
-desde Google Search Console".
+Bing 搜尋引擎（涵蓋 DuckDuckGo 與 Ecosia）：登入 <https://www.bing.com/webmasters> → 選擇「從 Google Search Console 匯入」。
 
-## 3. Lo que más posiciona (fuera de la web)
+## 3. 站外推廣與反向連結（提升排名的核心）
 
-Google sube las webs que otras webs enlazan y que la gente busca por su nombre:
+搜尋引擎極度看重權威網站的反向連結與品牌關鍵字搜尋量：
 
-- **Tráiler en YouTube** con el enlace en la primera línea de la descripción y el
-  título "PokéSurvivor – Juego Pokémon gratis en el navegador".
-- **itch.io**: crea una página del juego (gratis, en la categoría HTML5) con enlace.
-- **Reddit**: r/PokemonROMhacks, r/incremental_games, r/WebGames, r/survivorslikes
-  (lee sus normas; a muchos les gustan los fan games gratuitos sin anuncios).
-- **Discord**: servidores de fan games de Pokémon y de "survivors-like".
-- **TikTok / Shorts** con clips de 15 s (shinies, legendarios, cooperativo).
-- Pide a quien lo juegue que lo enlace o lo comparta: cada enlace cuenta.
+- **YouTube 實機展示或宣傳片**：在說明欄第一行置入遊戲連結，影片標題可命名為「PokéSurvivor – 免費瀏覽器寶可夢倖存者遊戲」。
+- **itch.io**：在 HTML5 分類建立免費遊戲展示頁，並附上正式遊戲官網連結。
+- **Reddit**：於 r/PokemonROMhacks、r/incremental_games、r/WebGames、r/survivorslikes 等相關板塊分享（請遵守各板板規，多數社群非常歡迎無廣告的免費同人自製遊戲）。
+- **Discord**：於寶可夢同人社群或類吸血鬼倖存者愛好者伺服器中分享交流。
+- **短影音平台（TikTok / Shorts / Reels）**：剪輯 15 秒精華短片（例如遭遇野外異色寶可夢、傳說寶可夢裂縫挑戰、4人連線混戰等）。
+- 邀請實況主或玩家體驗並分享官網連結。
 
-## 4. Con el tiempo
+## 4. 長期維護策略
 
-- Revisa en Search Console las **búsquedas** que te traen visitas y añade a la guía
-  respuestas a esas dudas.
-- Cada novedad grande: una entrada nueva (por ejemplo `novedades/`) y al sitemap.
-- Las páginas cargan rápido (Lighthouse: guía y Pokédex 100/100/100/100).
+- 定期於 Search Console 觀察帶來流量的**熱門搜尋字詞**，並於新手指南中擴充相應的解答。
+- 推出重大版本更新時：在 `novedades/` 新增更新紀錄並加入 Sitemap。
+- 頁面加載速度維持極致流暢（Lighthouse 效能與最佳實踐皆達標）。
 
-## Aviso
+## 法律版權注意事項
 
-"Pokémon" es una marca registrada. El nombre PokéSurvivor y el dominio pueden
-atraer avisos de The Pokémon Company; el aviso legal y el carácter gratuito y
-sin ánimo de lucro ayudan, pero no eliminan ese riesgo.
+「寶可夢（Pokémon）」為任天堂與 The Pokémon Company 註冊商標。使用 PokéSurvivor 作為專案名稱與獨立網域仍有潛在收到版權聲明的可能性；維持非營利、無內購、無廣告以及完整的免責聲明有助於降低風險，但無法完全免除。若接獲官方版權通知，應積極配合處理。
 
-## Cómo se trabaja ahora (importante)
+## 開發與發布工作流
 
-- **Se edita `dev.html`** (y los `js/`), no `index.html`. `dev.html` carga cada script
-  por separado para programar; `index.html` es la versión para publicar, con todo en
-  un solo `js/app.min.js` (la portada carga mucho más rápido).
-- Antes de probar la versión final o de publicar:
+- **日常開發編輯 `dev.html`**（以及 `js/` 底下的獨立源碼模組），切勿直接修改 `index.html`。`dev.html` 分開載入每個腳本，便於開發與除錯；`index.html` 為正式發布版本，將所有邏輯打包至 `js/app.min.js` 中。
+- 發布前必須依序執行：
 
-```
-node tools/build.js            # dev.html -> index.html + js/app.min.js
-node tools/export_data.js      # datos del juego para las páginas
-python tools/make_seo_pages.py # páginas en español e inglés, en/index.html, sitemap
+```bash
+node tools/build.js            # 將 dev.html 打包為 index.html + js/app.min.js
+node tools/export_data.js      # 匯出遊戲資料供靜態頁面生成
+python tools/make_seo_pages.py # 生成多語言頁面、en/index.html 與 sitemap
 ```
 
-## Idiomas
+## 語系支援
 
-- El juego sale en **inglés o español** según el idioma del navegador y se cambia en
-  Ajustes → Gráficos → Idioma. `/en/` abre el juego en inglés.
-- Textos en inglés: `js/data/lang-en.js` (clave = el texto en español). Si añades un
-  texto nuevo al juego, añade también su traducción ahí.
-- Páginas: guía, Pokédex, legendarios, shinies, tipos, movimientos, objetos, logros y
-  novedades, cada una en los dos idiomas y enlazadas entre sí (hreflang).
+- 遊戲支援英文與西班牙文，依據玩家瀏覽器語言自動呈現，亦可於「設定 → 畫面 → 語言」中切換。`/en/` 目錄直接開啟英文版。
+- 英文文字資源：集中於 `js/data/lang-en.js`（鍵值為西班牙文原文）。若新增文字需同步補齊對應鍵值。
+- 各靜態子頁面（指南、圖鑑、傳說寶可夢、異色寶可夢、屬性、招式、道具、成就與更新公告）皆具備雙語版本，並配置 `hreflang` 相互關聯。
