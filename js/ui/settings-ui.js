@@ -46,9 +46,7 @@ G.SettingsUI = (() => {
     if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
     else {
       const el = document.documentElement;
-      const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
-      // En móvil, además se intenta fijar la pantalla en horizontal.
-      if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* nada */ } }).catch(() => {});
+      (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
     }
     setTimeout(() => { if (isOpen()) render(); }, 300);
   }

@@ -18,7 +18,10 @@ G.Camera = {
 
   resize(cssW, cssH, dpr = 1) {
     this.dpr = dpr;
-    this.scale = Math.min(cssW / this.VIEW_W, cssH / this.MIN_VIEW_H);
+    const portrait = cssH > cssW;
+    const targetW = portrait ? 500 : this.VIEW_W;
+    const minH = portrait ? 760 : this.MIN_VIEW_H;
+    this.scale = Math.min(cssW / targetW, cssH / minH);
     this.w = cssW / this.scale;
     this.h = cssH / this.scale;
   },

@@ -6,7 +6,9 @@
  * Cada línea en español y en inglés.
  */
 G.CHANGELOG = [
-  { d: '2026-10-17', title: ['Idioma Chino Tradicional (Taiwán)', 'Traditional Chinese (Taiwan) Language'], new: [
+  { d: '2026-10-17', title: ['Modo vertical e idioma Chino Tradicional', 'Portrait Mode and Traditional Chinese'], new: [
+    ['Modo vertical en móvil: ya se puede jugar con el móvil en vertical, con interfaz y cámara adaptadas para jugar con una mano sin tener que girar la pantalla.',
+     'Portrait mode on mobile: you can now play in vertical orientation, with HUD and camera tailored for one-handed play without rotating your phone.'],
     ['Soporte completo para Chino Tradicional (zh-TW) con terminología y nombres oficiales de Pokémon en Taiwán (966 Pokémon, movimientos, objetos y menús).',
      'Full support for Traditional Chinese (zh-TW) with official Pokémon terminology and names from Taiwan (all 966 Pokémon, moves, held items, and UI).']
   ] },
