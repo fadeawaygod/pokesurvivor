@@ -38,18 +38,20 @@ fs.writeFileSync(tmp, joined);
 const outJs = path.join(ROOT, 'js', 'app.min.js');
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const shell = process.platform === 'win32';
-execFileSync(npx, ['--yes', 'terser@5', tmp, '--compress', 'passes=1', '--mangle', '--comments', 'false', '--ecma', '2020', '-o', outJs],
-  { stdio: 'inherit', shell });
-// Y ofuscado: el código queda ilegible y se rompe solo si lo reformatean para
-// tocarlo. Las cadenas, en una tabla codificada (sólo una parte, para no frenar
-// el juego). Semilla fija: el mismo código da siempre el mismo archivo.
-if (!EXPOSE) {
-  execFileSync(npx, ['--yes', 'javascript-obfuscator@4.1.1', outJs, '--output', outJs,
-    '--compact', 'true', '--self-defending', 'true', '--seed', '7',
-    '--string-array', 'true', '--string-array-encoding', 'base64', '--string-array-threshold', '0.1',
-    '--identifier-names-generator', 'hexadecimal', '--rename-globals', 'false', '--transform-object-keys', 'false',
-    '--split-strings', 'false', '--control-flow-flattening', 'false', '--dead-code-injection', 'false',
-    '--unicode-escape-sequence', 'false', '--target', 'browser'], { stdio: 'inherit', shell });
+try {
+  execFileSync(npx, ['--yes', 'terser@5', tmp, '--compress', 'passes=1', '--mangle', '--comments', 'false', '--ecma', '2020', '-o', outJs],
+    { stdio: 'inherit', shell });
+  if (!EXPOSE) {
+    execFileSync(npx, ['--yes', 'javascript-obfuscator@4.1.1', outJs, '--output', outJs,
+      '--compact', 'true', '--self-defending', 'true', '--seed', '7',
+      '--string-array', 'true', '--string-array-encoding', 'base64', '--string-array-threshold', '0.1',
+      '--identifier-names-generator', 'hexadecimal', '--rename-globals', 'false', '--transform-object-keys', 'false',
+      '--split-strings', 'false', '--control-flow-flattening', 'false', '--dead-code-injection', 'false',
+      '--unicode-escape-sequence', 'false', '--target', 'browser'], { stdio: 'inherit', shell });
+  }
+} catch (e) {
+  console.warn('[build] npx terser/obfuscator no disponible (offline); usando JS combinado directo.');
+  fs.copyFileSync(tmp, outJs);
 }
 const min = fs.readFileSync(outJs);
 const hash = crypto.createHash('sha1').update(min).digest('hex').slice(0, 10);

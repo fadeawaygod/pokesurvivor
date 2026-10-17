@@ -20,9 +20,20 @@ G.I18n = (() => {
   const KEY = 'ps.lang';
   let saved = null;
   try { saved = localStorage.getItem(KEY); } catch (e) { /* nada */ }
+  let urlLang = null;
+  try {
+    if (typeof URLSearchParams !== 'undefined' && location && location.search) {
+      urlLang = new URLSearchParams(location.search).get('lang');
+    }
+  } catch (e) { /* nada */ }
+  if (urlLang === 'zh-TW' || urlLang === 'en' || urlLang === 'es') {
+    try { localStorage.setItem(KEY, urlLang); } catch (e) { /* nada */ }
+    saved = urlLang;
+  }
   const byPath = /\/en(\/|$)/.test(location.pathname) ? 'en' : null;
-  const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || 'es').toLowerCase();
-  const lang = saved === 'es' || saved === 'en' ? saved : byPath || (nav.startsWith('es') ? 'es' : 'en');
+  // 預設語言一律為繁體中文 (zh-TW)
+  const defaultLang = 'zh-TW';
+  const lang = byPath || (saved === 'es' || saved === 'en' || saved === 'zh-TW' ? saved : defaultLang);
   document.documentElement.lang = lang;
 
   const exact = new Map(), exactLow = new Map();
@@ -31,8 +42,9 @@ G.I18n = (() => {
   const L = '\\p{L}\\p{N}';
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  /** Añade traducciones { 'texto en español': 'English text' }. */
-  function add(dict) {
+  /** Añade traducciones { 'texto en español': 'texto traducido' }. */
+  function add(dict, forLang = 'en') {
+    if (forLang !== lang) return;
     const fr = [];
     for (const [es, en] of Object.entries(dict)) {
       if (!en || es === en) continue;

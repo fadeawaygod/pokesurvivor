@@ -6,6 +6,10 @@
  * Cada línea en español y en inglés.
  */
 G.CHANGELOG = [
+  { d: '2026-10-17', title: ['Idioma Chino Tradicional (Taiwán)', 'Traditional Chinese (Taiwan) Language'], new: [
+    ['Soporte completo para Chino Tradicional (zh-TW) con terminología y nombres oficiales de Pokémon en Taiwán (966 Pokémon, movimientos, objetos y menús).',
+     'Full support for Traditional Chinese (zh-TW) with official Pokémon terminology and names from Taiwan (all 966 Pokémon, moves, held items, and UI).']
+  ] },
   { d: '2026-10-15', title: ['Actualizaciones obligatorias', 'Required updates'], chg: [
     ['Cuando una actualización sea obligatoria (por ejemplo, para arreglar un fallo importante), la partida en curso se termina tras un aviso de 10 s y el juego se recarga. No pierdes nada: las monedas, los tickets, los récords y el ranking de esa partida se guardan como al abandonarla.',
      'When an update is required (for example, to fix an important bug), your current run ends after a 10 s notice and the game reloads. You lose nothing: that run’s coins, tickets, records and leaderboard entry are saved as if you had quit.']

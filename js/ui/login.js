@@ -47,6 +47,10 @@ G.LoginUI = (() => {
       if (!r.ok) { $('login-err').textContent = r.error; return; }
       G.Flow.afterLogin();
     };
+    document.querySelectorAll('#login-langs [data-lang]').forEach(b => {
+      b.classList.toggle('on', b.dataset.lang === G.I18n.lang);
+      b.onclick = () => { if (b.dataset.lang !== G.I18n.lang) G.I18n.set(b.dataset.lang); };
+    });
   }
 
   /**
